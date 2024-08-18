@@ -75,7 +75,7 @@ public partial class Plugin : BasePlugin, IPluginConfig<Config>
     {
         Config = config;
 
-        string team = config.Team;
+        string team = config.Team.ToLower();
 
         if (team == "t" || team == "terrorist")
             allowedTeam = 2;
