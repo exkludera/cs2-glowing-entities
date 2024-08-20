@@ -121,7 +121,7 @@ public partial class Plugin : BasePlugin, IPluginConfig<Config>
 
     private Color ParseColor(string colorValue)
     {
-        var colorParts = colorValue.Split(',');
+        var colorParts = colorValue.Split(' ');
         if (colorParts.Length == 4 &&
             int.TryParse(colorParts[0], out var r) &&
             int.TryParse(colorParts[1], out var g) &&
