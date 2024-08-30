@@ -6,7 +6,7 @@
 
 <details>
 	<summary>showcase</summary>
-	<img src="https://cdn.discordapp.com/attachments/1039451649254629406/1273072243076763668/20240814021413_1.jpg?ex=66bd486b&is=66bbf6eb&hm=9a8e741d24cec0620c4db0b772d488e552336b9a07512004d56c8a5546b3218c&" width="500">
+	https://github.com/user-attachments/assets/c14285c7-c337-485f-80d1-c937d9706ce9
 </details>
 
 <br>
