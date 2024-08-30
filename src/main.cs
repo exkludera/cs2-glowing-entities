@@ -4,133 +4,111 @@ using CounterStrikeSharp.API.Modules.Utils;
 using static CounterStrikeSharp.API.Core.Listeners;
 using System.Drawing;
 
-namespace GlowingButtons;
-
-public class Config : BasePluginConfig
-{
-    public string Color { get; set; } = "255 255 255 128";
-    public string Model { get; set; } = "models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl";
-    public int Range { get; set; } = 5000;
-    public int RangeMin { get; set; } = 0;
-    public string Team { get; set; } = "";
-    public bool GlowOnAim { get; set; } = false;
-    public bool RemoveOnPress { get; set; } = true;
-}
-
 public partial class Plugin : BasePlugin, IPluginConfig<Config>
 {
-    public override string ModuleName => "Glowing Buttons";
-    public override string ModuleVersion => "1.0.0";
+    public override string ModuleName => "Glowing Entities";
+    public override string ModuleVersion => "1.1.0";
     public override string ModuleAuthor => "exkludera";
 
     public Dictionary<CEntityInstance, CEntityInstance> glowEntities = new Dictionary<CEntityInstance, CEntityInstance>();
-    public int allowedTeam;
-    public int glowType;
 
     public override void Load(bool hotReload)
     {
         RegisterListener<OnServerPrecacheResources>(OnServerPrecacheResources);
         RegisterEventHandler<EventRoundStart>(EventRoundStart);
-        HookEntityOutput("func_button", "OnPressed", (CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay) =>
-        {
-            if (caller != null && caller.IsValid)
-            {
-                if (Config.RemoveOnPress)
-                {
-                    caller.Remove();
-                    glowEntities.Remove(caller);
-                }
-            }
 
-            return HookResult.Continue;
-        }, HookMode.Post);
+        HookEntityOutput("*", "OnPressed", OnPressed, HookMode.Post);
+        HookEntityOutput("*", "OnTakeDamage", OnTakeDamage, HookMode.Post);
     }
 
     public override void Unload(bool hotReload)
     {
         RemoveListener<OnServerPrecacheResources>(OnServerPrecacheResources);
         DeregisterEventHandler<EventRoundStart>(EventRoundStart);
-        UnhookEntityOutput("func_button", "OnPressed", (CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay) =>
-        {
-            if (caller != null && caller.IsValid)
-            {
-                if (Config.RemoveOnPress)
-                {
-                    caller.Remove();
-                    glowEntities.Remove(caller);
-                }
-            }
 
-            return HookResult.Continue;
-        }, HookMode.Post);
-    }
-
-    public void OnServerPrecacheResources(ResourceManifest manifest)
-    {
-        manifest.AddResource(Config.Model);
+        UnhookEntityOutput("*", "OnPressed", OnPressed, HookMode.Post);
+        UnhookEntityOutput("*", "OnTakeDamage", OnTakeDamage, HookMode.Post);
     }
 
     public Config Config { get; set; } = new Config();
     public void OnConfigParsed(Config config)
     {
         Config = config;
+    }
 
-        string team = config.Team.ToLower();
-
-        if (team == "t" || team == "terrorist")
-            allowedTeam = 2;
-
-        else if (team == "ct" || team == "counterterrorist")
-            allowedTeam = 3;
-
-        else allowedTeam = -1;
-
-        glowType = Config.GlowOnAim ? 2 : 3;
+    public void OnServerPrecacheResources(ResourceManifest manifest)
+    {
+        foreach (var entity in Config.Entities)
+            manifest.AddResource(entity.Value.Model);
     }
 
     HookResult EventRoundStart(EventRoundStart @event, GameEventInfo info)
     {
-        var buttons = Utilities.FindAllEntitiesByDesignerName<CPhysicalButton>("func_button")!;
+        var entities = Utilities.GetAllEntities();
 
-        foreach (var button in buttons)
+        foreach (var entityConfig in Config.Entities)
         {
-            var modelGlow = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic")!;
+            var entityName = entityConfig.Key;
+            var settings = entityConfig.Value;
 
-            modelGlow.Spawnflags = 256;
-            modelGlow.Render = Color.Transparent;
+            foreach (var entity in entities)
+            {
+                if (entity.DesignerName.StartsWith(entityName))
+                {
+                    var cbaseentity = entity.As<CBaseEntity>();
 
-            modelGlow.CBodyComponent!.SceneNode!.Owner!.Entity!.Flags = (uint)(modelGlow.CBodyComponent!.SceneNode!.Owner!.Entity!.Flags & ~(1 << 2));
+                    var modelGlow = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic")!;
 
-            modelGlow.SetModel(Config.Model);
-            modelGlow.DispatchSpawn();
+                    modelGlow.Spawnflags = 256;
+                    modelGlow.Render = Color.Transparent;
 
-            modelGlow.Glow.GlowColorOverride = ParseColor(Config.Color);
-            modelGlow.Glow.GlowRange = Config.Range;
-            modelGlow.Glow.GlowRangeMin = Config.RangeMin;
-            modelGlow.Glow.GlowTeam = allowedTeam;
-            modelGlow.Glow.GlowType = glowType;
+                    modelGlow.CBodyComponent!.SceneNode!.Owner!.Entity!.Flags = (uint)(modelGlow.CBodyComponent!.SceneNode!.Owner!.Entity!.Flags & ~(1 << 2));
 
-            modelGlow.Teleport(button.AbsOrigin, button.AbsRotation, button.AbsVelocity);
-            modelGlow.AcceptInput("SetParent", button, modelGlow, "!activator");
+                    modelGlow.SetModel(!string.IsNullOrEmpty(settings.Model) ? settings.Model : cbaseentity.CBodyComponent!.SceneNode!.GetSkeletonInstance().ModelState.ModelName);
+                    modelGlow.DispatchSpawn();
 
-            glowEntities.Add(button, modelGlow);
+                    modelGlow.Glow.GlowColorOverride = Util.ParseColor(settings.Color);
+                    modelGlow.Glow.GlowRange = settings.Range;
+                    modelGlow.Glow.GlowRangeMin = settings.RangeMin;
+                    modelGlow.Glow.GlowTeam = Util.GetAllowedTeam(settings.Team);
+                    modelGlow.Glow.GlowType = settings.GlowOnAim ? 2 : 3;
+
+                    modelGlow.Teleport(cbaseentity.AbsOrigin, cbaseentity.AbsRotation, cbaseentity.AbsVelocity);
+                    modelGlow.AcceptInput("SetParent", entity, modelGlow, "!activator");
+
+                    glowEntities.Add(entity, modelGlow);
+                }
+            }
         }
 
         return HookResult.Continue;
     }
 
-    private Color ParseColor(string colorValue)
+    private HookResult OnPressed(CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay)
     {
-        var colorParts = colorValue.Split(' ');
-        if (colorParts.Length == 4 &&
-            int.TryParse(colorParts[0], out var r) &&
-            int.TryParse(colorParts[1], out var g) &&
-            int.TryParse(colorParts[2], out var b) &&
-            int.TryParse(colorParts[3], out var a))
+        if (Config.RemoveOnDamage)
         {
-            return Color.FromArgb(a, r, g, b);
+            if (glowEntities.TryGetValue(caller, out CEntityInstance? glow))
+            {
+                glow.Remove();
+                glowEntities.Remove(caller);
+            }
         }
 
-        return Color.FromArgb(255, 255, 255, 255);
+        return HookResult.Continue;
+    }
+
+    private HookResult OnTakeDamage(CEntityIOOutput output, string name, CEntityInstance activator, CEntityInstance caller, CVariant value, float delay)
+    {
+        if (Config.RemoveOnDamage)
+        {
+            if (glowEntities.TryGetValue(caller, out CEntityInstance? glow))
+            {
+                glow.Remove();
+                glowEntities.Remove(caller);
+            }
+        }
+
+        return HookResult.Continue;
     }
 }
