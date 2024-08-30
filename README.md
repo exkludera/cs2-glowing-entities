@@ -6,7 +6,9 @@
 
 <details>
 	<summary>showcase</summary>
-	https://github.com/user-attachments/assets/c14285c7-c337-485f-80d1-c937d9706ce9
+
+https://github.com/user-attachments/assets/ad117529-e2e8-4a39-86af-b372ffc3e15b
+
 </details>
 
 <br>
